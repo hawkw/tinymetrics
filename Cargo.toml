@@ -1,0 +1,32 @@
+[package]
+name = "tinymetrics"
+authors = ["Eliza Weisman <eliza@elizas.website>"]
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.56.0"
+
+license = "MIT"
+description = """
+a minimal, allocation-free metrics implementation for `no-std` and embedded
+projects.
+"""
+homepage = "https://github.com/hawkw/tinymetrics"
+repository = "https://github.com/hawkw/tinymetrics"
+documentation = "https://docs.rs/tinymetrics"
+readme = "README.md"
+categories = ["development-tools::debugging", "no-std"]
+keywords = ["no_std", "metrics", "prometheus"]
+
+[features]
+default = []
+alloc = []
+std = ["alloc"]
+
+[dependencies.serde]
+version = "1"
+default-features = false
+optional = true
+features = ["derive"]
+
+[dev-dependencies]
+pretty_assertions = "1.3.0"
