@@ -45,6 +45,16 @@ jobs:
       - name: cargo test
         run: cargo test --all-features
 
+  clippy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: olix0r/cargo-action-fmt@ee1ef42932e44794821dab57ef1bf7a73df8b21f
+      - name: rust toolchain
+        run: rustup show active-toolchain; cargo --version; rustc --version
+      - name: cargo clippy
+        run: cargo clippy --all-features --message-format=json | cargo-action-fmt
+
   rustfmt:
     runs-on: ubuntu-latest
     steps:
