@@ -167,17 +167,19 @@ impl<'a> MetricBuilder<'a> {
 
 // === impl MetricFamily ===
 
-impl<'a, M, L, const METRICS: usize> MetricFamily<'a, M, METRICS, L>
+impl<M, const METRICS: usize, L> MetricFamily<'_, M, METRICS, L> {
+    pub fn metrics(&self) -> &RegistryMap<L, M, METRICS> {
+        &self.metrics
+    }
+}
+
+impl<M, L, const METRICS: usize> MetricFamily<'_, M, METRICS, L>
 where
     M: FmtMetric,
     L: FmtLabels + PartialEq,
 {
     pub fn register(&self, labels: L) -> Option<&M> {
         self.metrics.get_or_register_default(labels)
-    }
-
-    pub fn metrics(&self) -> &RegistryMap<L, M, METRICS> {
-        &self.metrics
     }
 
     pub fn fmt_metric(&self, writer: &mut impl fmt::Write) -> fmt::Result {
@@ -215,9 +217,10 @@ where
     }
 }
 
-impl<'a, M, const METRICS: usize> fmt::Display for MetricFamily<'a, M, METRICS>
+impl<M, const METRICS: usize, L> fmt::Display for MetricFamily<'_, M, METRICS, L>
 where
     M: FmtMetric,
+    L: FmtLabels + PartialEq,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.fmt_metric(f)
