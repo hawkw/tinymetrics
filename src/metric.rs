@@ -15,17 +15,23 @@ pub struct MetricBuilder<'a> {
 }
 
 #[derive(Debug)]
-pub struct MetricFamily<'a, M, const METRICS: usize> {
+pub struct MetricFamily<'a, M, const METRICS: usize, L = LabelSlice<'a>> {
     def: MetricBuilder<'a>,
-    metrics: RegistryMap<Labels<'a>, M, METRICS>,
+    metrics: RegistryMap<L, M, METRICS>,
 }
 
-pub type GaugeFamily<'a, const METRICS: usize> = MetricFamily<'a, Gauge, METRICS>;
-pub type CounterFamily<'a, const METRICS: usize> = MetricFamily<'a, Counter, METRICS>;
-pub type Labels<'a> = &'a [(&'a str, &'a str)];
+pub type GaugeFamily<'a, const METRICS: usize, L = LabelSlice<'a>> =
+    MetricFamily<'a, Gauge, METRICS, L>;
+pub type CounterFamily<'a, const METRICS: usize, L = LabelSlice<'a>> =
+    MetricFamily<'a, Counter, METRICS, L>;
+type LabelSlice<'a> = &'a [(&'a str, &'a str)];
 
 pub trait FmtLabels {
     fn fmt_labels(&self, writer: &mut impl fmt::Write) -> fmt::Result;
+
+    fn is_empty(&self) -> bool {
+        false
+    }
 }
 
 pub trait FmtMetric: Default {
@@ -45,7 +51,74 @@ pub struct Counter {
     value: AtomicUsize,
 }
 
-// === impl MetricDef ===
+// === impl FmtLabels ===
+
+impl<L: FmtLabels> FmtLabels for &[L] {
+    fn fmt_labels(&self, writer: &mut impl fmt::Write) -> fmt::Result {
+        let mut labels = self.iter();
+        if let Some(label) = labels.next() {
+            label.fmt_labels(writer)?;
+
+            for label in labels {
+                writer.write_char(',')?;
+                label.fmt_labels(writer)?;
+            }
+        }
+
+        Ok(())
+    }
+
+    fn is_empty(&self) -> bool {
+        <[L]>::is_empty(self)
+    }
+}
+
+impl<L: FmtLabels, const LEN: usize> FmtLabels for [L; LEN] {
+    fn fmt_labels(&self, writer: &mut impl fmt::Write) -> fmt::Result {
+        (&self[..]).fmt_labels(writer)
+    }
+
+    fn is_empty(&self) -> bool {
+        LEN > 0
+    }
+}
+
+impl<K, V> FmtLabels for (K, V)
+where
+    K: fmt::Display,
+    V: fmt::Display,
+{
+    fn fmt_labels(&self, writer: &mut impl fmt::Write) -> fmt::Result {
+        let (k, v) = self;
+        write!(writer, "{}=\"{}\"", k, v)
+    }
+
+    fn is_empty(&self) -> bool {
+        false
+    }
+}
+
+impl FmtLabels for () {
+    fn fmt_labels(&self, _: &mut impl fmt::Write) -> fmt::Result {
+        Ok(())
+    }
+
+    fn is_empty(&self) -> bool {
+        true
+    }
+}
+
+impl<L: FmtLabels> FmtLabels for &'_ L {
+    fn fmt_labels(&self, writer: &mut impl fmt::Write) -> fmt::Result {
+        (*self).fmt_labels(writer)
+    }
+
+    fn is_empty(&self) -> bool {
+        (*self).is_empty()
+    }
+}
+
+// === impl MetricBuilder ===
 
 impl<'a> MetricBuilder<'a> {
     pub const fn new(name: &'a str) -> Self {
@@ -70,7 +143,7 @@ impl<'a> MetricBuilder<'a> {
         }
     }
 
-    pub const fn build<M, const METRICS: usize>(self) -> MetricFamily<'a, M, METRICS> {
+    pub const fn build<const METRICS: usize, M, L>(self) -> MetricFamily<'a, M, METRICS> {
         MetricFamily {
             def: self,
             metrics: RegistryMap::new(),
@@ -80,15 +153,16 @@ impl<'a> MetricBuilder<'a> {
 
 // === impl MetricFamily ===
 
-impl<'a, M, const METRICS: usize> MetricFamily<'a, M, METRICS>
+impl<'a, M, L, const METRICS: usize> MetricFamily<'a, M, METRICS, L>
 where
     M: FmtMetric,
+    L: FmtLabels + PartialEq,
 {
-    pub fn register<'fam>(&'fam self, labels: Labels<'a>) -> Option<&'fam M> {
+    pub fn register(&self, labels: L) -> Option<&M> {
         self.metrics.get_or_register_default(labels)
     }
 
-    pub fn metrics(&self) -> &RegistryMap<Labels<'a>, M, METRICS> {
+    pub fn metrics(&self) -> &RegistryMap<L, M, METRICS> {
         &self.metrics
     }
 
@@ -111,14 +185,9 @@ where
         for (labels, metric) in metrics.iter() {
             writer.write_str(name)?;
 
-            let mut labels = labels.iter();
-            if let Some(&(k, v)) = labels.next() {
-                write!(writer, "{{{k}=\"{v}\"")?;
-
-                for &(k, v) in labels {
-                    write!(writer, ",{k}=\"{v}\"")?;
-                }
-
+            if !labels.is_empty() {
+                writer.write_char('{')?;
+                labels.fmt_labels(writer)?;
                 writer.write_char('}')?;
             }
 
