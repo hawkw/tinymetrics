@@ -5,7 +5,7 @@ use crate::{
 use core::fmt;
 
 #[cfg(test)]
-pub mod tests;
+mod tests;
 
 #[derive(Debug)]
 pub struct MetricBuilder<'a> {
@@ -38,14 +38,11 @@ pub trait FmtMetric: Default {
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct Gauge {
     value: AtomicF32,
-    timestamp: AtomicUsize,
 }
 
 #[derive(Debug)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct Counter {
     value: AtomicUsize,
-    timestamp: AtomicUsize,
 }
 
 // === impl MetricDef ===
@@ -150,7 +147,6 @@ impl Gauge {
     pub const fn new() -> Self {
         Self {
             value: AtomicF32::zero(),
-            timestamp: AtomicUsize::new(0),
         }
     }
 
@@ -188,7 +184,6 @@ impl Counter {
     pub const fn new() -> Self {
         Self {
             value: AtomicUsize::new(0),
-            timestamp: AtomicUsize::new(0),
         }
     }
 
@@ -217,5 +212,12 @@ impl FmtMetric for Counter {
 impl Default for Counter {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+#[cfg(feature = "serde")]
+impl serde::Serialize for Counter {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        self.value().serialize(serializer)
     }
 }
