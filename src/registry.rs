@@ -106,7 +106,7 @@ impl<T, const CAPACITY: usize> Registry<T, CAPACITY> {
     ///
     /// [full]: Registry::is_full
     #[track_caller]
-    pub fn register<'registry>(&'registry self, value: T) -> &'registry T {
+    pub fn register(&self, value: T) -> &T {
         match self.try_register(value) {
             Ok(slot) => slot,
             Err(_) => panic!("this registry can contain only {CAPACITY} values"),
@@ -140,10 +140,9 @@ impl<T, const CAPACITY: usize> Registry<T, CAPACITY> {
     /// // containing the original value:
     /// assert!(REGISTRY.try_register("baz").is_err());
     /// ```
-    #[must_use]
     ///
     /// [full]: Self::is_full
-    pub fn try_register<'registry>(&'registry self, value: T) -> Result<&'registry T, T> {
+    pub fn try_register(&self, value: T) -> Result<&T, T> {
         let idx = self.next.fetch_add(1, AcqRel);
 
         let Some(slot) = self.values.get(idx) else {
@@ -179,7 +178,7 @@ impl<T, const CAPACITY: usize> Registry<T, CAPACITY> {
     /// - [`None`] if the registry is [full].
     ///
     /// [full]: Self::is_full
-    pub fn try_register_default<'registry>(&'registry self) -> Option<&'registry T>
+    pub fn try_register_default(&self) -> Option<&T>
     where
         T: Default,
     {
@@ -438,11 +437,7 @@ impl<K, V, const CAPACITY: usize> RegistryMap<K, V, CAPACITY> {
     /// // `value2` is a reference to the same entry as `value1`.
     /// assert!(core::ptr::eq(value1, value2));
     /// ```
-    pub fn get_or_register_with<'registry>(
-        &'registry self,
-        key: K,
-        init: impl FnOnce() -> V,
-    ) -> Option<&'registry V>
+    pub fn get_or_register_with(&self, key: K, init: impl FnOnce() -> V) -> Option<&V>
     where
         K: PartialEq,
     {
@@ -497,7 +492,7 @@ impl<K, V, const CAPACITY: usize> RegistryMap<K, V, CAPACITY> {
     /// ```
     ///
     /// [`get_or_register_with`]: Self::get_or_register_with
-    pub fn get_or_register_default<'registry>(&'registry self, key: K) -> Option<&'registry V>
+    pub fn get_or_register_default(&self, key: K) -> Option<&V>
     where
         K: PartialEq,
         V: Default,
@@ -535,7 +530,7 @@ impl<K, V, const CAPACITY: usize> RegistryMap<K, V, CAPACITY> {
     /// // `value2` is a reference to the same entry as `value1`.
     /// assert!(core::ptr::eq(value1, value2));
     /// ```
-    pub fn get_or_register<'registry>(&'registry self, key: K, value: V) -> Option<&'registry V>
+    pub fn get_or_register(&self, key: K, value: V) -> Option<&V>
     where
         K: PartialEq,
     {
