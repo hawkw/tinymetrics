@@ -5,8 +5,8 @@ use core::{
     iter::{DoubleEndedIterator, FusedIterator},
     mem::MaybeUninit,
     ptr, slice,
-    sync::atomic::{AtomicBool, AtomicUsize, Ordering::*},
 };
+use portable_atomic::{AtomicBool, AtomicUsize, Ordering::*};
 
 #[cfg(feature = "serde")]
 use serde::{

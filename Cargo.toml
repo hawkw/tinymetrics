@@ -18,9 +18,14 @@ categories = ["development-tools::debugging", "no-std"]
 keywords = ["no_std", "metrics", "prometheus"]
 
 [features]
-default = []
+default = ["timestamp"]
 alloc = []
 std = ["alloc"]
+timestamp = []
+serde = ["dep:serde", "portable-atomic/serde"]
+
+[dependencies]
+portable-atomic = { version = "1", features = ["float"] }
 
 [dependencies.serde]
 version = "1"

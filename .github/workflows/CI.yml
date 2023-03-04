@@ -33,7 +33,7 @@ env:
   rust-toolchain: nightly
 
 jobs:
-  test:
+  test-all-features:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
@@ -44,6 +44,19 @@ jobs:
         run: cargo build --all-features --message-format=json | cargo-action-fmt
       - name: cargo test
         run: cargo test --all-features
+
+  test-no-features:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: olix0r/cargo-action-fmt@ee1ef42932e44794821dab57ef1bf7a73df8b21f
+      - name: rust toolchain
+        run: rustup show active-toolchain; cargo --version; rustc --version
+      - name: cargo build
+        run: cargo build --no-default-features --message-format=json | cargo-action-fmt
+      - name: cargo test
+        run: cargo test --no-default-features
+
 
   clippy:
     runs-on: ubuntu-latest

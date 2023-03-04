@@ -1,8 +1,9 @@
-use crate::{
-    atomic::{AtomicF32, AtomicUsize, Ordering},
-    registry::RegistryMap,
-};
+use crate::registry::RegistryMap;
 use core::fmt;
+use portable_atomic::{AtomicF64, AtomicUsize, Ordering};
+
+#[cfg(feature = "timestamp")]
+use crate::timestamp::{TimestampCell, UnixTimestamp};
 
 #[cfg(test)]
 mod tests;
@@ -12,6 +13,8 @@ pub struct MetricBuilder<'a> {
     name: &'a str,
     help: Option<&'a str>,
     unit: Option<&'a str>,
+    #[cfg(feature = "timestamp")]
+    timestamp_fn: Option<fn() -> UnixTimestamp>,
 }
 
 #[derive(Debug)]
@@ -34,21 +37,30 @@ pub trait FmtLabels {
     }
 }
 
-pub trait FmtMetric: Default {
+pub trait Metric {
     const TYPE: &'static str;
 
     fn fmt_metric<F: fmt::Write>(&self, writer: &mut F) -> fmt::Result;
+
+    fn build(builder: &MetricBuilder<'_>) -> Self;
 }
 
 #[derive(Debug)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct Gauge {
-    value: AtomicF32,
+    value: AtomicF64,
+
+    #[cfg(feature = "timestamp")]
+    timestamp: Option<TimestampCell>,
 }
 
 #[derive(Debug)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct Counter {
     value: AtomicUsize,
+
+    #[cfg(feature = "timestamp")]
+    timestamp: Option<TimestampCell>,
 }
 
 // === impl FmtLabels ===
@@ -126,6 +138,12 @@ impl<'a> MetricBuilder<'a> {
             name,
             help: None,
             unit: None,
+
+            #[cfg(all(feature = "std", feature = "timestamp"))]
+            timestamp_fn: Some(UnixTimestamp::now),
+
+            #[cfg(all(not(feature = "std"), feature = "timestamp"))]
+            timestamp_fn: None,
         }
     }
 
@@ -143,9 +161,33 @@ impl<'a> MetricBuilder<'a> {
         }
     }
 
+    #[cfg(feature = "timestamp")]
+    pub const fn with_timestamp(self, timestamp_fn: fn() -> UnixTimestamp) -> Self {
+        Self {
+            timestamp_fn: Some(timestamp_fn),
+            ..self
+        }
+    }
+
+    #[cfg(feature = "timestamp")]
+    pub const fn without_timestamps(self) -> Self {
+        Self {
+            timestamp_fn: None,
+            ..self
+        }
+    }
+
+    #[cfg(feature = "timestamp")]
+    const fn mk_timestamp(&self) -> Option<TimestampCell> {
+        match self.timestamp_fn {
+            Some(t) => Some(TimestampCell::new(t)),
+            None => None,
+        }
+    }
+
     pub const fn build<M, const METRICS: usize>(self) -> MetricFamily<'a, M, METRICS>
     where
-        M: FmtMetric,
+        M: Metric,
     {
         MetricFamily {
             def: self,
@@ -155,7 +197,7 @@ impl<'a> MetricBuilder<'a> {
 
     pub const fn build_labeled<M, L, const METRICS: usize>(self) -> MetricFamily<'a, M, METRICS, L>
     where
-        M: FmtMetric,
+        M: Metric,
         L: FmtLabels + PartialEq,
     {
         MetricFamily {
@@ -175,17 +217,20 @@ impl<M, const METRICS: usize, L> MetricFamily<'_, M, METRICS, L> {
 
 impl<M, L, const METRICS: usize> MetricFamily<'_, M, METRICS, L>
 where
-    M: FmtMetric,
+    M: Metric,
     L: FmtLabels + PartialEq,
 {
     pub fn register(&self, labels: L) -> Option<&M> {
-        self.metrics.get_or_register_default(labels)
+        self.metrics
+            .get_or_register_with(labels, || M::build(&self.def))
     }
 
     pub fn fmt_metric(&self, writer: &mut impl fmt::Write) -> fmt::Result {
         let Self {
             metrics,
-            def: MetricBuilder { name, help, unit },
+            def: MetricBuilder {
+                name, help, unit, ..
+            },
         } = self;
 
         writeln!(writer, "# TYPE {name} {}", M::TYPE)?;
@@ -219,7 +264,7 @@ where
 
 impl<M, const METRICS: usize, L> fmt::Display for MetricFamily<'_, M, METRICS, L>
 where
-    M: FmtMetric,
+    M: Metric,
     L: FmtLabels + PartialEq,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -230,50 +275,65 @@ where
 // === impl Gauge ===
 
 impl Gauge {
-    pub const fn new() -> Self {
+    const fn from_builder(builder: &MetricBuilder<'_>) -> Self {
         Self {
-            value: AtomicF32::zero(),
+            value: AtomicF64::new(0.0),
+            #[cfg(feature = "timestamp")]
+            timestamp: builder.mk_timestamp(),
         }
     }
 
-    pub fn set_value(&self, value: f32) {
+    pub fn set_value(&self, value: f64) {
+        #[cfg(feature = "timestamp")]
+        if let Some(ref timestamp) = self.timestamp {
+            if !timestamp.update_if_ahead() {
+                return;
+            }
+        }
         self.value.store(value, Ordering::Release);
     }
 
-    pub fn value(&self) -> f32 {
+    pub fn value(&self) -> f64 {
         self.value.load(Ordering::Acquire)
     }
 }
 
-impl FmtMetric for Gauge {
+impl Metric for Gauge {
     const TYPE: &'static str = "gauge";
 
     fn fmt_metric<F: fmt::Write>(&self, writer: &mut F) -> fmt::Result {
-        write!(
-            writer,
-            "{}",
-            self.value(),
-            // self.timestamp.load(Ordering::Acquire)
-        )
-    }
-}
+        write!(writer, "{}", self.value())?;
 
-impl Default for Gauge {
-    fn default() -> Self {
-        Self::new()
+        #[cfg(feature = "timestamp")]
+        if let Some(now) = self.timestamp.as_ref().map(TimestampCell::timestamp) {
+            write!(writer, " {now}",)?;
+        }
+
+        Ok(())
+    }
+
+    fn build(builder: &MetricBuilder<'_>) -> Self {
+        Self::from_builder(builder)
     }
 }
 
 // === impl Counter ===
 
 impl Counter {
-    pub const fn new() -> Self {
+    const fn from_builder(builder: &MetricBuilder<'_>) -> Self {
         Self {
             value: AtomicUsize::new(0),
+
+            #[cfg(feature = "timestamp")]
+            timestamp: builder.mk_timestamp(),
         }
     }
 
     pub fn fetch_add(&self, value: usize) -> usize {
+        #[cfg(feature = "timestamp")]
+        if let Some(ref timestamp) = self.timestamp {
+            timestamp.update_max();
+        }
         self.value.fetch_add(value, Ordering::Release)
     }
 
@@ -282,28 +342,21 @@ impl Counter {
     }
 }
 
-impl FmtMetric for Counter {
+impl Metric for Counter {
     const TYPE: &'static str = "counter";
 
     fn fmt_metric<F: fmt::Write>(&self, writer: &mut F) -> fmt::Result {
-        write!(
-            writer,
-            "{}",
-            self.value(),
-            // self.timestamp.load(Ordering::Acquire)
-        )
-    }
-}
+        write!(writer, "{}", self.value(),)?;
 
-impl Default for Counter {
-    fn default() -> Self {
-        Self::new()
-    }
-}
+        #[cfg(feature = "timestamp")]
+        if let Some(now) = self.timestamp.as_ref().map(TimestampCell::timestamp) {
+            write!(writer, " {now}")?;
+        }
 
-#[cfg(feature = "serde")]
-impl serde::Serialize for Counter {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        self.value().serialize(serializer)
+        Ok(())
+    }
+
+    fn build(builder: &MetricBuilder<'_>) -> Self {
+        Self::from_builder(builder)
     }
 }
