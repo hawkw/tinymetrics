@@ -143,7 +143,21 @@ impl<'a> MetricBuilder<'a> {
         }
     }
 
-    pub const fn build<const METRICS: usize, M, L>(self) -> MetricFamily<'a, M, METRICS> {
+    pub const fn build<M, const METRICS: usize>(self) -> MetricFamily<'a, M, METRICS>
+    where
+        M: FmtMetric,
+    {
+        MetricFamily {
+            def: self,
+            metrics: RegistryMap::new(),
+        }
+    }
+
+    pub const fn build_labeled<M, L, const METRICS: usize>(self) -> MetricFamily<'a, M, METRICS, L>
+    where
+        M: FmtMetric,
+        L: FmtLabels + PartialEq,
+    {
         MetricFamily {
             def: self,
             metrics: RegistryMap::new(),
