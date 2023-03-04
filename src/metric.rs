@@ -88,7 +88,7 @@ where
     M: FmtMetric,
 {
     pub fn register<'fam>(&'fam self, labels: Labels<'a>) -> Option<&'fam M> {
-        self.metrics.register_default(labels)
+        self.metrics.get_or_register_default(labels)
     }
 
     pub fn metrics(&self) -> &RegistryMap<Labels<'a>, M, METRICS> {
