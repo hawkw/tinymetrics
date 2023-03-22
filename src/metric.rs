@@ -243,7 +243,7 @@ where
 
         writeln!(
             writer,
-            "# TYPE {name} {ty}\n# HELP {name} {help}\n# UNIT {name} {unit}",
+            "# TYPE {name} {ty}\n# UNIT {name} {unit}\n# HELP {name} {help}",
             ty = M::TYPE
         )?;
 

@@ -23,8 +23,8 @@ fn gauge() {
 
     let expected = "\
     # TYPE test_gauge gauge\n\
-    # HELP test_gauge a test gauge\n\
     # UNIT test_gauge tests\n\
+    # HELP test_gauge a test gauge\n\
     test_gauge{metric=\"1\",label2=\"foo\"} 10\n\
     test_gauge{metric=\"2\",label2=\"bar\"} 22.2\n\n\
     ";
@@ -54,8 +54,8 @@ fn counter() {
 
     let expected = "\
     # TYPE test_counter counter\n\
-    # HELP test_counter a test counter\n\
     # UNIT test_counter tests\n\
+    # HELP test_counter a test counter\n\
     test_counter{metric=\"1\",label2=\"foo\"} 1\n\
     test_counter{metric=\"2\",label2=\"bar\"} 2\n\n\
     ";
@@ -88,8 +88,8 @@ fn gauge_timestamped() {
 
     let expected = "\
     # TYPE test_gauge gauge\n\
-    # HELP test_gauge a test gauge\n\
     # UNIT test_gauge tests\n\
+    # HELP test_gauge a test gauge\n\
     test_gauge{metric=\"1\",label2=\"foo\"} 10 100\n\
     test_gauge{metric=\"2\",label2=\"bar\"} 22.2 200\n\n\
     ";
@@ -127,8 +127,8 @@ fn counter_timestamped() {
 
     let expected = "\
     # TYPE test_counter counter\n\
-    # HELP test_counter a test counter\n\
     # UNIT test_counter tests\n\
+    # HELP test_counter a test counter\n\
     test_counter{metric=\"1\",label2=\"foo\"} 1 100\n\
     test_counter{metric=\"2\",label2=\"bar\"} 2 200\n\n\
     ";
