@@ -12,8 +12,8 @@ mod tests;
 #[derive(Debug)]
 pub struct MetricBuilder<'a> {
     name: &'a str,
-    help: Option<&'a str>,
-    unit: Option<&'a str>,
+    help: &'a str,
+    unit: &'a str,
     #[cfg(feature = "timestamp")]
     timestamp_fn: Option<fn() -> UnixTimestamp>,
 }
@@ -150,8 +150,8 @@ impl<'a> MetricBuilder<'a> {
     pub const fn new(name: &'a str) -> Self {
         Self {
             name,
-            help: None,
-            unit: None,
+            help: "",
+            unit: "",
 
             #[cfg(all(feature = "std", feature = "timestamp"))]
             timestamp_fn: Some(UnixTimestamp::now),
@@ -162,17 +162,11 @@ impl<'a> MetricBuilder<'a> {
     }
 
     pub const fn with_help(self, help: &'a str) -> Self {
-        Self {
-            help: Some(help),
-            ..self
-        }
+        Self { help, ..self }
     }
 
     pub const fn with_unit(self, unit: &'a str) -> Self {
-        Self {
-            unit: Some(unit),
-            ..self
-        }
+        Self { unit, ..self }
     }
 
     #[cfg(feature = "timestamp")]
@@ -247,15 +241,11 @@ where
             },
         } = self;
 
-        writeln!(writer, "# TYPE {name} {}", M::TYPE)?;
-
-        if let Some(help) = help {
-            writeln!(writer, "# HELP {name} {help}")?;
-        }
-
-        if let Some(unit) = unit {
-            writeln!(writer, "# UNIT {name} {unit}")?;
-        }
+        writeln!(
+            writer,
+            "# TYPE {name} {ty}\n# HELP {name} {help}\n# UNIT {name} {unit}",
+            ty = M::TYPE
+        )?;
 
         for (labels, metric) in metrics.iter() {
             writer.write_str(name)?;
