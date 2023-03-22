@@ -8,6 +8,7 @@ use crate::timestamp::{TimestampCell, UnixTimestamp};
 #[cfg(test)]
 mod tests;
 
+/// A builder for constructing [`MetricFamily`] instances.
 #[derive(Debug)]
 pub struct MetricBuilder<'a> {
     name: &'a str,
@@ -17,6 +18,11 @@ pub struct MetricBuilder<'a> {
     timestamp_fn: Option<fn() -> UnixTimestamp>,
 }
 
+/// An OpenMetrics [MetricFamily].
+///
+/// A MetricFamily is a collection of metrics points with the same name and metadata.
+///
+/// [MetricFamily]: https://github.com/OpenObservability/OpenMetrics/blob/main/specification/OpenMetrics.md#metricfamily
 #[derive(Debug)]
 pub struct MetricFamily<'a, M, const METRICS: usize, L = LabelSlice<'a>> {
     def: MetricBuilder<'a>,
@@ -29,6 +35,10 @@ pub type CounterFamily<'a, const METRICS: usize, L = LabelSlice<'a>> =
     MetricFamily<'a, Counter, METRICS, L>;
 type LabelSlice<'a> = &'a [(&'a str, &'a str)];
 
+/// Trait implemented by types which can be formatted as an OpenMetrics
+/// [LabelSet].
+///
+/// [LabelSet]: https://github.com/OpenObservability/OpenMetrics/blob/main/specification/OpenMetrics.md#labelset
 pub trait FmtLabels {
     fn fmt_labels(&self, writer: &mut impl fmt::Write) -> fmt::Result;
 
@@ -37,6 +47,10 @@ pub trait FmtLabels {
     }
 }
 
+/// Trait implemented by types which can be formatted as an OpenMetrics
+/// [MetricPoint].
+///
+/// [MetricPoint]: https://github.com/OpenObservability/OpenMetrics/blob/main/specification/OpenMetrics.md#metricpoint
 pub trait Metric {
     const TYPE: &'static str;
 
