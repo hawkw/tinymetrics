@@ -3,6 +3,24 @@
 a minimal, allocation-free [Prometheus]/[OpenMetrics] metrics implementation for
 `no-std` and embedded projects.
 
+[![crates.io][crates-badge]][crates-url]
+[![Documentation][docs-badge]][docs-url]
+[![Documentation (HEAD)][docs-main-badge]][docs-main-url]
+[![MIT licensed][mit-badge]][mit-url]
+[![Test Status][tests-badge]][tests-url]
+[![Sponsor @hawkw on GitHub Sponsors][sponsor-badge]][sponsor-url]
+
+[crates-badge]: https://img.shields.io/crates/v/tinymetrics.svg
+[crates-url]: https://crates.io/crates/tinymetrics
+[docs-badge]: https://docs.rs/tinymetrics/badge.svg
+[docs-url]: https://docs.rs/tinymetrics
+[mit-badge]: https://img.shields.io/badge/license-MIT-blue.svg
+[mit-url]: ../LICENSE
+[tests-badge]: https://github.com/hawkw/tinymetrics/actions/workflows/CI.yml/badge.svg?branch=main
+[tests-url]: https://github.com/hawkw/tinymetrics/actions/workflows/CI.yml
+[sponsor-badge]: https://img.shields.io/badge/sponsor-%F0%9F%A4%8D-ff69b4
+[sponsor-url]: https://github.com/sponsors/hawkw
+
 ## why should you use it?
 
 you may want to use this crate if:
@@ -27,7 +45,7 @@ you may want to use this crate if:
 4. **you only need [counter] and [gauge] metrics.** i haven't implemented the
    [summary] and [histogram] metric types yet, although it would be nice to
    eventually.
-   
+
 [Prometheus]: https://prometheus.io/
 [OpenMetrics]: https://github.com/OpenObservability/OpenMetrics
 [`metrics` crate]: https://docs.rs/metrics/
