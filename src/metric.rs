@@ -68,6 +68,22 @@ pub struct Gauge {
     timestamp: Option<TimestampCell>,
 }
 
+/// A gauge metric whose value is always an integer.
+///
+/// This is similar to the [`Gauge`] metric type, but its value is represented
+/// by an [`AtomicUsize`] rather than an [`AtomicF64`]. This is not a standardized
+/// OpenMetrics metric type, but it is exported as though it were a standard
+/// Gauge metric. This is intended primarily for use on hardware platforms that
+/// lack 64-bit hardware floating point.
+#[derive(Debug)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+pub struct IntGauge {
+    value: AtomicUsize,
+
+    #[cfg(feature = "timestamp")]
+    timestamp: Option<TimestampCell>,
+}
+
 #[derive(Debug)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct Counter {
@@ -355,6 +371,51 @@ impl Metric for Counter {
         #[cfg(feature = "timestamp")]
         if let Some(now) = self.timestamp.as_ref().map(TimestampCell::timestamp) {
             write!(writer, " {now}")?;
+        }
+
+        Ok(())
+    }
+
+    fn build(builder: &MetricBuilder<'_>) -> Self {
+        Self::from_builder(builder)
+    }
+}
+
+// === impl IntGauge ===
+
+impl IntGauge {
+    const fn from_builder(builder: &MetricBuilder<'_>) -> Self {
+        Self {
+            value: AtomicUsize::new(0),
+            #[cfg(feature = "timestamp")]
+            timestamp: builder.mk_timestamp(),
+        }
+    }
+
+    pub fn set_value(&self, value: usize) {
+        #[cfg(feature = "timestamp")]
+        if let Some(ref timestamp) = self.timestamp {
+            if !timestamp.update_if_ahead() {
+                return;
+            }
+        }
+        self.value.store(value, Ordering::Release);
+    }
+
+    pub fn value(&self) -> usize {
+        self.value.load(Ordering::Acquire)
+    }
+}
+
+impl Metric for IntGauge {
+    const TYPE: &'static str = "gauge";
+
+    fn fmt_metric<F: fmt::Write>(&self, writer: &mut F) -> fmt::Result {
+        write!(writer, "{}", self.value())?;
+
+        #[cfg(feature = "timestamp")]
+        if let Some(now) = self.timestamp.as_ref().map(TimestampCell::timestamp) {
+            write!(writer, " {now}",)?;
         }
 
         Ok(())
