@@ -1,5 +1,5 @@
 use core::fmt;
-use portable_atomic::{AtomicU64, Ordering};
+use portable_atomic::{AtomicU64, Ordering::*};
 
 /// A Unix timestamp, represented in seconds since the Unix epoch.
 #[derive(Copy, Clone, Debug, Default, Eq, PartialEq, Hash)]
@@ -8,6 +8,7 @@ pub struct UnixTimestamp(u64);
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub(crate) struct TimestampCell {
     now: AtomicU64,
+    created: AtomicU64,
     #[cfg_attr(feature = "serde", serde(skip))]
     timestamp_fn: fn() -> UnixTimestamp,
 }
@@ -57,35 +58,49 @@ impl TimestampCell {
     pub(crate) const fn new(timestamp_fn: fn() -> UnixTimestamp) -> Self {
         Self {
             now: AtomicU64::new(0),
+            created: AtomicU64::new(0),
             timestamp_fn,
         }
     }
 
     pub(crate) fn update_max(&self) {
         let now = (self.timestamp_fn)().as_secs();
-        self.now.fetch_max(now, Ordering::AcqRel);
+        self.update_created(now);
+        self.now.fetch_max(now, AcqRel);
     }
 
     pub(crate) fn update_if_ahead(&self) -> bool {
         let now = (self.timestamp_fn)().as_secs();
-        let mut curr = self.now.load(Ordering::Relaxed);
+        self.update_created(now);
+        let mut curr = self.now.load(Relaxed);
         loop {
             if now <= curr {
                 return false;
             }
 
-            match self
-                .now
-                .compare_exchange_weak(curr, now, Ordering::AcqRel, Ordering::Acquire)
-            {
+            match self.now.compare_exchange_weak(curr, now, AcqRel, Acquire) {
                 Ok(_) => return true,
                 Err(actual) => curr = actual,
             }
         }
     }
 
+    #[inline]
+    fn update_created(&self, now: u64) {
+        let _ = self.created.compare_exchange(0, now, AcqRel, Relaxed);
+    }
+
     pub(crate) fn timestamp(&self) -> UnixTimestamp {
-        UnixTimestamp::from_secs(self.now.load(Ordering::Relaxed))
+        UnixTimestamp::from_secs(self.now.load(Relaxed))
+    }
+
+    pub(crate) fn created(&self) -> Option<UnixTimestamp> {
+        let created = self.created.load(Relaxed);
+        if created == 0 {
+            return None;
+        }
+
+        Some(UnixTimestamp::from_secs(created))
     }
 }
 
