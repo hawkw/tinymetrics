@@ -63,6 +63,40 @@ fn counter() {
 }
 
 #[test]
+fn gauges_dont_start_at_0_if_unrecorded() {
+    let family = {
+        let builder = MetricBuilder::new("test_gauge")
+            .with_help("a test gauge")
+            .with_unit("tests");
+        #[cfg(feature = "timestamp")]
+        let builder = builder.without_timestamps();
+        builder.build::<Gauge, 2>()
+    };
+    let metric1 = family
+        .register(&[("metric", "1"), ("label2", "foo")])
+        .expect("metric 1 must register");
+
+    let expected = "\
+        # TYPE test_gauge gauge\n\
+        # UNIT test_gauge tests\n\
+        # HELP test_gauge a test gauge\n\
+        \n\
+    ";
+    assert_str_eq!(family.to_string(), expected);
+
+    metric1.set_value(10.0);
+
+    let expected = "\
+        # TYPE test_gauge gauge\n\
+        # UNIT test_gauge tests\n\
+        # HELP test_gauge a test gauge\n\
+        test_gauge{metric=\"1\",label2=\"foo\"} 10\n\
+        \n\
+    ";
+    assert_str_eq!(family.to_string(), expected);
+}
+
+#[test]
 #[cfg(feature = "timestamp")]
 fn gauge_timestamped() {
     use portable_atomic::{AtomicU64, Ordering};

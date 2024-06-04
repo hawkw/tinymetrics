@@ -1,6 +1,6 @@
 use crate::registry::RegistryMap;
 use core::fmt;
-use portable_atomic::{AtomicF64, AtomicUsize, Ordering};
+use portable_atomic::{AtomicBool, AtomicF64, AtomicUsize, Ordering};
 
 #[cfg(feature = "timestamp")]
 use crate::timestamp::{TimestampCell, UnixTimestamp};
@@ -54,6 +54,10 @@ pub trait FmtLabels {
 pub trait Metric {
     const TYPE: &'static str;
 
+    fn has_been_recorded(&self) -> bool {
+        true
+    }
+
     fn fmt_metric<F: fmt::Write>(&self, writer: &mut F) -> fmt::Result;
 
     fn build(builder: &MetricBuilder<'_>) -> Self;
@@ -63,7 +67,7 @@ pub trait Metric {
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct Gauge {
     value: AtomicF64,
-
+    recorded: AtomicBool,
     #[cfg(feature = "timestamp")]
     timestamp: Option<TimestampCell>,
 }
@@ -79,7 +83,7 @@ pub struct Gauge {
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct IntGauge {
     value: AtomicUsize,
-
+    recorded: AtomicBool,
     #[cfg(feature = "timestamp")]
     timestamp: Option<TimestampCell>,
 }
@@ -264,6 +268,9 @@ where
         )?;
 
         for (labels, metric) in metrics.iter() {
+            if !metric.has_been_recorded() {
+                continue;
+            }
             writer.write_str(name)?;
 
             if !labels.is_empty() {
@@ -297,7 +304,8 @@ where
 impl Gauge {
     const fn from_builder(builder: &MetricBuilder<'_>) -> Self {
         Self {
-            value: AtomicF64::new(0.0),
+            value: AtomicF64::new(f64::NAN),
+            recorded: AtomicBool::new(false),
             #[cfg(feature = "timestamp")]
             timestamp: builder.mk_timestamp(),
         }
@@ -311,6 +319,7 @@ impl Gauge {
             }
         }
         self.value.store(value, Ordering::Release);
+        self.recorded.store(true, Ordering::Release);
     }
 
     pub fn value(&self) -> f64 {
@@ -320,6 +329,10 @@ impl Gauge {
 
 impl Metric for Gauge {
     const TYPE: &'static str = "gauge";
+
+    fn has_been_recorded(&self) -> bool {
+        !self.value().is_nan() || self.recorded.load(Ordering::Acquire)
+    }
 
     fn fmt_metric<F: fmt::Write>(&self, writer: &mut F) -> fmt::Result {
         write!(writer, "{}", self.value())?;
@@ -366,7 +379,7 @@ impl Metric for Counter {
     const TYPE: &'static str = "counter";
 
     fn fmt_metric<F: fmt::Write>(&self, writer: &mut F) -> fmt::Result {
-        write!(writer, "{}", self.value(),)?;
+        write!(writer, "{}", self.value())?;
 
         #[cfg(feature = "timestamp")]
         if let Some(now) = self.timestamp.as_ref().map(TimestampCell::timestamp) {
@@ -387,6 +400,7 @@ impl IntGauge {
     const fn from_builder(builder: &MetricBuilder<'_>) -> Self {
         Self {
             value: AtomicUsize::new(0),
+            recorded: AtomicBool::new(false),
             #[cfg(feature = "timestamp")]
             timestamp: builder.mk_timestamp(),
         }
@@ -400,6 +414,7 @@ impl IntGauge {
             }
         }
         self.value.store(value, Ordering::Release);
+        self.recorded.store(true, Ordering::Release);
     }
 
     pub fn value(&self) -> usize {
@@ -409,6 +424,10 @@ impl IntGauge {
 
 impl Metric for IntGauge {
     const TYPE: &'static str = "gauge";
+
+    fn has_been_recorded(&self) -> bool {
+        self.value() != 0 || self.recorded.load(Ordering::Acquire)
+    }
 
     fn fmt_metric<F: fmt::Write>(&self, writer: &mut F) -> fmt::Result {
         write!(writer, "{}", self.value())?;
