@@ -76,6 +76,10 @@ fn gauges_dont_start_at_0_if_unrecorded() {
         .register(&[("metric", "1"), ("label2", "foo")])
         .expect("metric 1 must register");
 
+    let metric2 = family
+        .register(&[("metric", "2"), ("label2", "bar")])
+        .expect("metric 2 must register");
+
     let expected = "\
         # TYPE test_gauge gauge\n\
         # UNIT test_gauge tests\n\
@@ -91,6 +95,18 @@ fn gauges_dont_start_at_0_if_unrecorded() {
         # UNIT test_gauge tests\n\
         # HELP test_gauge a test gauge\n\
         test_gauge{metric=\"1\",label2=\"foo\"} 10\n\
+        \n\
+    ";
+    assert_str_eq!(family.to_string(), expected);
+
+    metric2.set_value(5.0);
+
+    let expected = "\
+        # TYPE test_gauge gauge\n\
+        # UNIT test_gauge tests\n\
+        # HELP test_gauge a test gauge\n\
+        test_gauge{metric=\"1\",label2=\"foo\"} 10\n\
+        test_gauge{metric=\"2\",label2=\"bar\"} 5\n\
         \n\
     ";
     assert_str_eq!(family.to_string(), expected);
