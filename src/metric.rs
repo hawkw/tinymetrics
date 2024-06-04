@@ -289,6 +289,120 @@ where
     }
 }
 
+impl<M, L, const METRICS: usize> MetricFamily<'_, M, METRICS, L>
+where
+    M: Metric,
+{
+    fn iter_recorded(&self) -> impl Iterator<Item = (&L, &M)> + '_ {
+        self.metrics.iter().filter(|(_, m)| m.has_been_recorded())
+    }
+}
+
+impl<L, const METRICS: usize> MetricFamily<'_, IntGauge, METRICS, L> {
+    fn recorded_values(&self) -> impl Iterator<Item = usize> + '_ {
+        self.iter_recorded().map(|(_, metric)| metric.value())
+    }
+
+    #[must_use]
+    pub fn min_value(&self) -> Option<usize> {
+        self.recorded_values().min()
+    }
+
+    #[must_use]
+    pub fn max_value(&self) -> Option<usize> {
+        self.recorded_values().max()
+    }
+
+    #[must_use]
+    pub fn mean(&self) -> Option<usize> {
+        let mut recorded = 0;
+        let mut sum = 0;
+        for val in self.recorded_values() {
+            recorded += 1;
+            sum += val;
+        }
+
+        if recorded > 0 {
+            Some(sum / recorded)
+        } else {
+            None
+        }
+    }
+}
+
+impl<L, const METRICS: usize> MetricFamily<'_, Gauge, METRICS, L> {
+    fn recorded_values(&self) -> impl Iterator<Item = f64> + '_ {
+        self.iter_recorded().map(|(_, metric)| metric.value())
+    }
+
+    #[must_use]
+    pub fn min_value(&self) -> Option<f64> {
+        self.recorded_values().reduce(f64::min)
+    }
+
+    #[must_use]
+    pub fn max_value(&self) -> Option<f64> {
+        self.recorded_values().reduce(f64::max)
+    }
+
+    #[must_use]
+    pub fn total(&self) -> f64 {
+        self.recorded_values().sum()
+    }
+
+    pub fn mean(&self) -> Option<f64> {
+        let mut recorded = 0;
+        let mut sum = 0.0;
+        for (_, metric) in self.iter_recorded() {
+            recorded += 1;
+            sum += metric.value();
+        }
+
+        if recorded > 0 {
+            Some(sum / recorded as f64)
+        } else {
+            None
+        }
+    }
+}
+
+impl<L, const METRICS: usize> MetricFamily<'_, Counter, METRICS, L> {
+    fn recorded_values(&self) -> impl Iterator<Item = usize> + '_ {
+        self.iter_recorded().map(|(_, metric)| metric.value())
+    }
+
+    #[must_use]
+    pub fn min_value(&self) -> Option<usize> {
+        self.recorded_values().min()
+    }
+
+    #[must_use]
+    pub fn max_value(&self) -> Option<usize> {
+        self.recorded_values().max()
+    }
+
+    #[must_use]
+    pub fn total(&self) -> usize {
+        self.recorded_values().sum()
+    }
+
+    #[must_use]
+    pub fn mean(&self) -> Option<usize> {
+        let mut recorded = 0;
+        let mut sum = 0;
+        for val in self.recorded_values() {
+            recorded += 1;
+            sum += val;
+        }
+
+        if recorded > 0 {
+            Some(sum / recorded)
+        } else {
+            None
+        }
+    }
+}
+
 impl<M, const METRICS: usize, L> fmt::Display for MetricFamily<'_, M, METRICS, L>
 where
     M: Metric,

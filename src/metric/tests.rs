@@ -184,3 +184,235 @@ fn counter_timestamped() {
     ";
     assert_str_eq!(family.to_string(), expected);
 }
+
+#[test]
+fn gauge_min() {
+    let family = {
+        let builder = MetricBuilder::new("test_gauge");
+        #[cfg(feature = "timestamp")]
+        let builder = builder.without_timestamps();
+        builder.build::<Gauge, 3>()
+    };
+    let metric1 = family
+        .register(&[("metric", "1"), ("label2", "foo")])
+        .expect("metric 1 must register");
+    metric1.set_value(10.0);
+
+    let metric2 = family
+        .register(&[("metric", "2"), ("label2", "bar")])
+        .expect("metric 2 must register");
+    metric2.set_value(22.2);
+
+    let metric3 = family
+        .register(&[("metric", "3"), ("label2", "baz")])
+        .expect("metric 2 must register");
+    metric3.set_value(33.3);
+
+    assert_eq!(family.min_value(), Some(10.0));
+}
+
+#[test]
+fn gauge_max() {
+    let family = {
+        let builder = MetricBuilder::new("test_gauge");
+        #[cfg(feature = "timestamp")]
+        let builder = builder.without_timestamps();
+        builder.build::<Gauge, 3>()
+    };
+    let metric1 = family
+        .register(&[("metric", "1"), ("label2", "foo")])
+        .expect("metric 1 must register");
+    metric1.set_value(10.0);
+
+    let metric2 = family
+        .register(&[("metric", "2"), ("label2", "bar")])
+        .expect("metric 2 must register");
+    metric2.set_value(22.2);
+
+    let metric3 = family
+        .register(&[("metric", "3"), ("label2", "baz")])
+        .expect("metric 2 must register");
+    metric3.set_value(33.3);
+
+    assert_eq!(family.max_value(), Some(33.3));
+}
+
+#[test]
+fn gauge_total() {
+    let family = {
+        let builder = MetricBuilder::new("test_gauge");
+        #[cfg(feature = "timestamp")]
+        let builder = builder.without_timestamps();
+        builder.build::<Gauge, 4>()
+    };
+    let metric1 = family
+        .register(&[("metric", "1"), ("label2", "foo")])
+        .expect("metric 1 must register");
+    metric1.set_value(10.0);
+
+    // register an unrecorded metric to ensure that it doesn't get added to the
+    // total.
+    let _metric2 = family
+        .register(&[("metric", "unrecorded"), ("label2", "lol")])
+        .expect("metric 2 must register");
+
+    let metric3 = family
+        .register(&[("metric", "2"), ("label2", "bar")])
+        .expect("metric 2 must register");
+    metric3.set_value(22.0);
+
+    let metric4 = family
+        .register(&[("metric", "3"), ("label2", "baz")])
+        .expect("metric 2 must register");
+    metric4.set_value(33.0);
+
+    assert_eq!(family.total(), 65.0);
+}
+
+#[test]
+fn gauge_mean() {
+    let family = {
+        let builder = MetricBuilder::new("test_gauge");
+        #[cfg(feature = "timestamp")]
+        let builder = builder.without_timestamps();
+        builder.build::<Gauge, 4>()
+    };
+    let metric1 = family
+        .register(&[("metric", "1"), ("label2", "foo")])
+        .expect("metric 1 must register");
+    metric1.set_value(2.0);
+
+    // register an unrecorded metric to ensure that it doesn't get added to the
+    // mean.
+    let _metric2 = family
+        .register(&[("metric", "unrecorded"), ("label2", "lol")])
+        .expect("metric 2 must register");
+
+    let metric3 = family
+        .register(&[("metric", "2"), ("label2", "bar")])
+        .expect("metric 3 must register");
+    metric3.set_value(5.0);
+
+    let metric4 = family
+        .register(&[("metric", "3"), ("label2", "baz")])
+        .expect("metric 4 must register");
+    metric4.set_value(14.0);
+
+    assert_eq!(family.mean(), Some(7.0));
+}
+
+#[test]
+fn counter_min() {
+    let family = {
+        let builder = MetricBuilder::new("test_counter");
+        #[cfg(feature = "timestamp")]
+        let builder = builder.without_timestamps();
+        builder.build::<Counter, 3>()
+    };
+    let metric1 = family
+        .register(&[("metric", "1"), ("label2", "foo")])
+        .expect("metric 1 must register");
+    metric1.fetch_add(10);
+
+    let metric2 = family
+        .register(&[("metric", "2"), ("label2", "bar")])
+        .expect("metric 2 must register");
+    metric2.fetch_add(22);
+
+    let metric3 = family
+        .register(&[("metric", "3"), ("label2", "baz")])
+        .expect("metric 2 must register");
+    metric3.fetch_add(33);
+
+    assert_eq!(family.min_value(), Some(10));
+}
+
+#[test]
+fn counter_max() {
+    let family = {
+        let builder = MetricBuilder::new("test_counter");
+        #[cfg(feature = "timestamp")]
+        let builder = builder.without_timestamps();
+        builder.build::<Counter, 3>()
+    };
+    let metric1 = family
+        .register(&[("metric", "1"), ("label2", "foo")])
+        .expect("metric 1 must register");
+    metric1.fetch_add(10);
+
+    let metric2 = family
+        .register(&[("metric", "2"), ("label2", "bar")])
+        .expect("metric 2 must register");
+    metric2.fetch_add(22);
+
+    let metric3 = family
+        .register(&[("metric", "3"), ("label2", "baz")])
+        .expect("metric 2 must register");
+    metric3.fetch_add(33);
+
+    assert_eq!(family.max_value(), Some(33));
+}
+
+#[test]
+fn counter_total() {
+    let family = {
+        let builder = MetricBuilder::new("test_counter");
+        #[cfg(feature = "timestamp")]
+        let builder = builder.without_timestamps();
+        builder.build::<Counter, 4>()
+    };
+    let metric1 = family
+        .register(&[("metric", "1"), ("label2", "foo")])
+        .expect("metric 1 must register");
+    metric1.fetch_add(10);
+
+    // register an unrecorded metric to ensure that it doesn't get added to the
+    // total.
+    let _metric2 = family
+        .register(&[("metric", "unrecorded"), ("label2", "lol")])
+        .expect("metric 2 must register");
+
+    let metric3 = family
+        .register(&[("metric", "2"), ("label2", "bar")])
+        .expect("metric 2 must register");
+    metric3.fetch_add(22);
+
+    let metric4 = family
+        .register(&[("metric", "3"), ("label2", "baz")])
+        .expect("metric 2 must register");
+    metric4.fetch_add(33);
+
+    assert_eq!(family.total(), 65);
+}
+
+#[test]
+fn counter_mean() {
+    let family = {
+        let builder = MetricBuilder::new("test_counter");
+        #[cfg(feature = "timestamp")]
+        let builder = builder.without_timestamps();
+        builder.build::<Counter, 4>()
+    };
+    let metric1 = family
+        .register(&[("metric", "1"), ("label2", "foo")])
+        .expect("metric 1 must register");
+    metric1.fetch_add(2);
+
+    // register an unrecorded metric to ensure that it doesn't get added to the
+    // mean.
+    let _metric2 = family
+        .register(&[("metric", "unrecorded"), ("label2", "lol")])
+        .expect("metric 2 must register");
+
+    let metric3 = family
+        .register(&[("metric", "2"), ("label2", "bar")])
+        .expect("metric 2 must register");
+    metric3.fetch_add(5);
+
+    let metric4 = family
+        .register(&[("metric", "3"), ("label2", "baz")])
+        .expect("metric 2 must register");
+    metric4.fetch_add(14);
+
+    assert_eq!(family.mean(), Some(7));
+}
