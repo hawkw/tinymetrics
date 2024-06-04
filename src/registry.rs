@@ -397,6 +397,12 @@ where
     }
 }
 
+impl<T, const CAPACITY: usize> Default for Registry<T, CAPACITY> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 // === impl RegistryMap ===
 
 impl<K, V, const CAPACITY: usize> RegistryMap<K, V, CAPACITY> {
@@ -773,6 +779,12 @@ where
             map.serialize_entry(key, value)?;
         }
         map.end()
+    }
+}
+
+impl<K, V, const CAPACITY: usize> Default for RegistryMap<K, V, CAPACITY> {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
