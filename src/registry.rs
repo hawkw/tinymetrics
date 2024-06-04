@@ -939,7 +939,7 @@ impl<T> Slot<T> {
         unsafe {
             // Safety: we just checked the bit that tracks whether this value
             // was initialized.
-            Some((&*self.value.get()).assume_init_ref())
+            Some((*self.value.get()).assume_init_ref())
         }
     }
 }
