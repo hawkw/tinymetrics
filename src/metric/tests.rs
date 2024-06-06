@@ -398,21 +398,24 @@ fn counter_mean() {
         .expect("metric 1 must register");
     metric1.fetch_add(2);
 
-    // register an unrecorded metric to ensure that it doesn't get added to the
-    // mean.
-    let _metric2 = family
-        .register(&[("metric", "unrecorded"), ("label2", "lol")])
-        .expect("metric 2 must register");
-
-    let metric3 = family
+    let metric2 = family
         .register(&[("metric", "2"), ("label2", "bar")])
         .expect("metric 2 must register");
-    metric3.fetch_add(5);
+    metric2.fetch_add(5);
 
-    let metric4 = family
+    let metric3 = family
         .register(&[("metric", "3"), ("label2", "baz")])
         .expect("metric 2 must register");
-    metric4.fetch_add(14);
-
+    metric3.fetch_add(14);
     assert_eq!(family.mean(), Some(7));
+
+    // N.B.: counters have different behavior with unrecorded values, since they
+    // start at 0 as soon as they're registered.
+    //
+    // Registering a new counter without recording a value will set the mean to
+    // 5, since there are now 4 counters rather than three.
+    let _metric4 = family
+        .register(&[("metric", "4"), ("label2", "qux")])
+        .expect("metric 4 must register");
+    assert_eq!(family.mean(), Some(5));
 }
