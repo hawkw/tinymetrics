@@ -1,6 +1,8 @@
 use crate::registry::RegistryMap;
 use core::fmt;
 use portable_atomic::{AtomicBool, AtomicF64, AtomicUsize, Ordering};
+#[cfg(feature = "serde")]
+use serde::{Serialize, Serializer};
 
 #[cfg(feature = "timestamp")]
 use crate::timestamp::{TimestampCell, UnixTimestamp};
@@ -64,10 +66,10 @@ pub trait Metric {
 }
 
 #[derive(Debug)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct Gauge {
     value: AtomicF64,
     recorded: AtomicBool,
+
     #[cfg(feature = "timestamp")]
     timestamp: Option<TimestampCell>,
 }
@@ -80,16 +82,15 @@ pub struct Gauge {
 /// Gauge metric. This is intended primarily for use on hardware platforms that
 /// lack 64-bit hardware floating point.
 #[derive(Debug)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct IntGauge {
     value: AtomicUsize,
     recorded: AtomicBool,
+
     #[cfg(feature = "timestamp")]
     timestamp: Option<TimestampCell>,
 }
 
 #[derive(Debug)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct Counter {
     value: AtomicUsize,
 
@@ -464,6 +465,20 @@ impl Metric for Gauge {
     }
 }
 
+#[cfg(feature = "serde")]
+impl Serialize for Gauge {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        if self.has_been_recorded() {
+            serializer.serialize_some(&self.value())
+        } else {
+            serializer.serialize_none()
+        }
+    }
+}
+
 // === impl Counter ===
 
 impl Counter {
@@ -505,6 +520,16 @@ impl Metric for Counter {
 
     fn build(builder: &MetricBuilder<'_>) -> Self {
         Self::from_builder(builder)
+    }
+}
+
+#[cfg(feature = "serde")]
+impl Serialize for Counter {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        self.value().serialize(serializer)
     }
 }
 
@@ -556,5 +581,19 @@ impl Metric for IntGauge {
 
     fn build(builder: &MetricBuilder<'_>) -> Self {
         Self::from_builder(builder)
+    }
+}
+
+#[cfg(feature = "serde")]
+impl Serialize for IntGauge {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        if self.has_been_recorded() {
+            serializer.serialize_some(&self.value())
+        } else {
+            serializer.serialize_none()
+        }
     }
 }

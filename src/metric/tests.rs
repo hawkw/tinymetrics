@@ -419,3 +419,172 @@ fn counter_mean() {
         .expect("metric 4 must register");
     assert_eq!(family.mean(), Some(5));
 }
+
+#[cfg(feature = "serde")]
+#[derive(serde::Serialize, Eq, PartialEq)]
+#[serde(transparent)]
+struct SerdeLabels(&'static str);
+
+#[cfg(feature = "serde")]
+impl crate::metric::FmtLabels for SerdeLabels {
+    fn fmt_labels(&self, writer: &mut impl core::fmt::Write) -> core::fmt::Result {
+        write!(writer, "metric=\"{}\"", self.0)
+    }
+}
+
+#[test]
+#[cfg(feature = "serde")]
+fn gauge_serializes() {
+    let family = {
+        let builder = MetricBuilder::new("test_gauge")
+            .with_help("a test gauge")
+            .with_unit("tests");
+        #[cfg(feature = "timestamp")]
+        let builder = builder.without_timestamps();
+        builder.build_labeled::<Gauge, _, 3>()
+    };
+
+    let metric1 = family
+        .register(SerdeLabels("1"))
+        .expect("metric 1 must register");
+    metric1.set_value(10.0);
+
+    let metric2 = family
+        .register(SerdeLabels("2"))
+        .expect("metric 2 must register");
+
+    metric2.set_value(22.2);
+
+    let metric3 = family
+        .register(SerdeLabels("3"))
+        .expect("metric 2 must register");
+
+    let expected = serde_json::json!({
+        "1": 10.0,
+        "2": 22.2,
+        "3": Option::<f64>::None,
+    });
+    let json =
+        dbg!(serde_json::to_string_pretty(&family.metrics())).expect("metrics must serialize");
+    let actual =
+        serde_json::from_str::<serde_json::Value>(&json).expect("metrics must deserialize");
+    assert_eq!(actual, expected);
+
+    metric3.set_value(33.3);
+
+    let expected = serde_json::json!({
+        "1": 10.0,
+        "2": 22.2,
+        "3": 33.3,
+    });
+    let json =
+        dbg!(serde_json::to_string_pretty(&family.metrics())).expect("metrics must serialize");
+    let actual =
+        serde_json::from_str::<serde_json::Value>(&json).expect("metrics must deserialize");
+    assert_eq!(actual, expected);
+}
+
+#[test]
+#[cfg(feature = "serde")]
+fn int_gauge_serializes() {
+    let family = {
+        let builder = MetricBuilder::new("test_gauge")
+            .with_help("a test gauge")
+            .with_unit("tests");
+        #[cfg(feature = "timestamp")]
+        let builder = builder.without_timestamps();
+        builder.build_labeled::<IntGauge, _, 3>()
+    };
+
+    let metric1 = family
+        .register(SerdeLabels("1"))
+        .expect("metric 1 must register");
+    metric1.set_value(10);
+
+    let metric2 = family
+        .register(SerdeLabels("2"))
+        .expect("metric 2 must register");
+
+    metric2.set_value(22);
+
+    let metric3 = family
+        .register(SerdeLabels("3"))
+        .expect("metric 2 must register");
+
+    let expected = serde_json::json!({
+        "1": 10,
+        "2": 22,
+        "3": Option::<f64>::None,
+    });
+    let json =
+        dbg!(serde_json::to_string_pretty(&family.metrics())).expect("metrics must serialize");
+    let actual =
+        serde_json::from_str::<serde_json::Value>(&json).expect("metrics must deserialize");
+    assert_eq!(actual, expected);
+
+    metric3.set_value(33);
+
+    let expected = serde_json::json!({
+        "1": 10,
+        "2": 22,
+        "3": 33,
+    });
+    let json =
+        dbg!(serde_json::to_string_pretty(&family.metrics())).expect("metrics must serialize");
+    let actual =
+        serde_json::from_str::<serde_json::Value>(&json).expect("metrics must deserialize");
+    assert_eq!(actual, expected);
+}
+
+#[test]
+#[cfg(feature = "serde")]
+fn counter_serializes() {
+    let family = {
+        let builder = MetricBuilder::new("test_gauge")
+            .with_help("a test gauge")
+            .with_unit("tests");
+        #[cfg(feature = "timestamp")]
+        let builder = builder.without_timestamps();
+        builder.build_labeled::<Counter, _, 3>()
+    };
+
+    let metric1 = family
+        .register(SerdeLabels("1"))
+        .expect("metric 1 must register");
+    metric1.fetch_add(10);
+
+    let metric2 = family
+        .register(SerdeLabels("2"))
+        .expect("metric 2 must register");
+
+    metric2.fetch_add(20);
+
+    let metric3 = family
+        .register(SerdeLabels("3"))
+        .expect("metric 2 must register");
+
+    let expected = serde_json::json!({
+        "1": 10,
+        "2": 20,
+        "3": 0,
+    });
+    let json =
+        dbg!(serde_json::to_string_pretty(&family.metrics())).expect("metrics must serialize");
+    let actual =
+        serde_json::from_str::<serde_json::Value>(&json).expect("metrics must deserialize");
+    assert_eq!(actual, expected);
+
+    metric2.fetch_add(2);
+    metric3.fetch_add(33);
+
+    let expected = serde_json::json!({
+        "1": 10,
+        "2": 22,
+        "3": 33,
+    });
+    let json =
+        dbg!(serde_json::to_string_pretty(&family.metrics())).expect("metrics must serialize");
+    let actual =
+        serde_json::from_str::<serde_json::Value>(&json).expect("metrics must deserialize");
+    assert_eq!(actual, expected);
+}
